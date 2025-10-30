@@ -1,0 +1,80 @@
+# ============ UNITY CORE ============
+[Ll]ibrary/
+[Tt]emp/
+[Oo]bj/
+[Bb]uild/
+[Bb]uilds/
+[Ll]ogs/
+[Mm]emoryCaptures/
+UserSettings/
+Recordings/
+ShaderCache/
+Artifacts/
+SceneDependencyCache/
+CrashReports/
+ScriptAssemblies/
+DerivedDataCache/
+
+# ============ PACKAGE MANAGER ============
+[Pp]ackages/com.unity.package-manager/
+[Pp]ackages/packages-lock.json
+
+# ============ PLATFORM BUILDS ============
+*.apk
+*.aab
+*.app
+*.ipa
+*.exe
+*.dll
+*.so
+*.dylib
+*.bundle
+*.appx
+*.msix
+*.msixupload
+*.xcodeproj
+*.xcworkspace
+*.xcuserstate
+
+# ============ IDE / ENVIRONMENTS ============
+.vscode/
+.idea/
+*.sln
+*.csproj
+*.unityproj
+*.user
+*.userprefs
+*.pidb
+*.booproj
+*.mdb
+*.db
+
+# ============ BACKUPS & TEMP ============
+*.tmp
+*.bak
+*.old
+*.orig
+*.save
+*.stackdump
+*.crash
+*.swp
+*.swm
+*.swo
+*.log
+*.mem
+*.meta~
+
+# ============ OS FILES ============
+.DS_Store
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+
+# ============ UNITY PACKAGES ============
+*.unitypackage
+
+# ============ RIDER / VS CACHES ============
+.idea/
+.vscode/
+.vs/
+*.DotSettings.user
