@@ -64,11 +64,12 @@ public class EnemyGenerator : MonoBehaviour
         int side; // 0=Left,1=Right,2=Bottom,3=Top
         GetRandomBorderPosition(out spawnPos, out side);
 
-        GameObject enemy = Instantiate(enemyPrefab, spawnPos, Quaternion.identity);
-        EnemyMover mover = enemy.GetComponent<EnemyMover>();
-        if (mover != null)
+        GameObject enemyObj = Instantiate(enemyPrefab, spawnPos, Quaternion.identity);
+        Enemy enemy = enemyObj.GetComponent<Enemy>();
+        if (enemy != null)
         {
-            mover.Initialize(grid, side);
+            enemy.Initialize(grid, side);
+            enemy.SetupEnemy();
         }
         else
         {

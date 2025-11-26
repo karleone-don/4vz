@@ -1,10 +1,15 @@
 using UnityEngine;
-using UnityEngine.InputSystem; // новая Input System
+using UnityEngine.InputSystem;
 
 public class Cell : MonoBehaviour
 {
     public int x;
     public int y;
+
+    // текущее строение на клетке
+    public Building buildingOnCell = null;
+
+    public bool IsFree => buildingOnCell == null;
 
     private void Start()
     {
@@ -22,8 +27,37 @@ public class Cell : MonoBehaviour
             Collider2D hit = Physics2D.OverlapPoint(mousePos);
             if (hit != null && hit.gameObject == gameObject)
             {
-                Debug.Log($"Clicked cell: x = {x}, y = {y}");
+                Debug.Log($"Clicked cell: x = {x}, y = {y}, free = {IsFree}");
             }
+        }
+    }
+    public Vector3 GetCenter()
+    {
+        return transform.position;
+    }
+
+    // установка здания на клетку
+    public void PlaceBuilding(Building building)
+    {
+        if (IsFree)
+        {
+            buildingOnCell = building;
+            building.transform.position = transform.position;
+            building.transform.SetParent(transform);
+        }
+        else
+        {
+            Debug.LogWarning("Клетка занята!");
+        }
+    }
+
+    // удаление здания
+    public void RemoveBuilding()
+    {
+        if (!IsFree)
+        {
+            Destroy(buildingOnCell.gameObject);
+            buildingOnCell = null;
         }
     }
 }

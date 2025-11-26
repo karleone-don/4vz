@@ -1,3 +1,4 @@
+// GridGenerator.cs
 using UnityEngine;
 
 public class GridGenerator : MonoBehaviour
@@ -9,9 +10,11 @@ public class GridGenerator : MonoBehaviour
     public Sprite sprite2;
     public float gap = 0.1f;
     public float size = 1f;
+    public Cell[,] gridArray;
 
     void Awake()
     {
+        gridArray = new Cell[width, height];
         GenerateGrid();
     }
 
@@ -24,21 +27,28 @@ public class GridGenerator : MonoBehaviour
         {
             for (int y = 0; y < height; y++)
             {
-                GameObject cell = new GameObject($"Cell_{x}_{y}");
-                float posX = x * (cellSize + gap) - offsetX + cellSize/size;
-                float posY = y * (cellSize + gap) - offsetY + cellSize/size;
-                cell.transform.position = new Vector3(posX, posY, 0);
-                cell.transform.parent = transform;
+                GameObject cellObj = new GameObject($"Cell_{x}_{y}");
+                float posX = x * (cellSize + gap) - offsetX + cellSize / size;
+                float posY = y * (cellSize + gap) - offsetY + cellSize / size;
+                cellObj.transform.position = new Vector3(posX, posY, 0);
+                cellObj.transform.parent = transform;
 
-                SpriteRenderer sr = cell.AddComponent<SpriteRenderer>();
+                SpriteRenderer sr = cellObj.AddComponent<SpriteRenderer>();
                 sr.sprite = ((x + y) % 2 == 0) ? sprite1 : sprite2;
 
-                Cell cellComp = cell.AddComponent<Cell>();
+                Cell cellComp = cellObj.AddComponent<Cell>();
                 cellComp.x = x;
                 cellComp.y = y;
 
-                cell.transform.localScale = new Vector3(cellSize*5f, cellSize*5f, 1);
+                cellObj.transform.localScale = new Vector3(cellSize * 5f, cellSize * 5f, 1);
+
+                gridArray[x, y] = cellComp; // важно!
             }
         }
+    }
+
+    public Cell GetCell(int x, int y)
+    {
+        return gridArray[x, y];
     }
 }
