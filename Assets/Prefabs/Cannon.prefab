@@ -30,7 +30,7 @@ Transform:
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
   m_LocalPosition: {x: 0, y: 0, z: 0}
-  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_LocalScale: {x: 1.3, y: 1.3, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
   m_Father: {fileID: 0}
@@ -177,3 +177,9 @@ MonoBehaviour:
   damage: 0
   energyCost: 0
   price: 0
+  scanRange: 100
+  fireCooldown: 0.5
+  rotationSpeed: 180
+  bulletPrefab: {fileID: 2767952718456987118, guid: 2121e6c45d27bad41bbf45e6a8f7f2fd, type: 3}
+  turret: {fileID: 0}
+  muzzle: {fileID: 0}
