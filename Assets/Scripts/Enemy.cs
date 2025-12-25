@@ -10,14 +10,24 @@ public abstract class Enemy : EnemyMover
     public abstract void SetupEnemy();
     // В класс Enemy добавь метод:
     public void TakeDamage(int dmg)
-    {
-        hp -= dmg;
-        Debug.Log($"{name} получил {dmg} урона! Осталось HP: {hp}");
+{
+    hp -= dmg;
+    Debug.Log($"{name} получил {dmg} урона! Осталось HP: {hp}");
 
-        if (hp <= 0)
-        {
-            Debug.Log($"{name} уничтожен!");
-            Destroy(gameObject);
-        }
+    // звук попадания по зомби
+    if (SoundManager.Instance != null)
+        SoundManager.Instance.PlayZombieHit();
+
+    if (hp <= 0)
+    {
+        Debug.Log($"{name} уничтожен!");
+
+        // звук смерти зомби
+        if (SoundManager.Instance != null)
+            SoundManager.Instance.PlayZombieDie();
+
+        Destroy(gameObject);
     }
+}
+
 }

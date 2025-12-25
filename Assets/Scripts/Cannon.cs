@@ -117,26 +117,33 @@ public class Cannon : Building
     }
 
     private void Fire(Transform target)
+{
+    if (bulletPrefab == null)
     {
-        if (bulletPrefab == null)
-        {
-            Debug.LogWarning("Нет префаба снаряда!");
-            return;
-        }
-
-        Debug.Log($"Пушка выстрелила в {target.name}!");
-
-        
-
-        // Создаём снаряд
-        GameObject bulletGO = Instantiate(bulletPrefab, muzzle.position, muzzle.rotation);
-        Bullet bullet = bulletGO.GetComponent<Bullet>();
-        if (bullet != null)
-        {
-            bullet.SetTarget(target);
-            bullet.damage = damage;
-        }
+        Debug.LogWarning("Нет префаба снаряда!");
+        return;
     }
+
+    Debug.Log($"Пушка выстрелила в {target.name}!");
+
+
+    // Безопасный вызов звука
+    if (SoundManager.Instance != null)
+    {
+        SoundManager.Instance.PlayShoot();
+    }
+
+
+    // Создаём снаряд
+    GameObject bulletGO = Instantiate(bulletPrefab, muzzle.position, muzzle.rotation);
+    Bullet bullet = bulletGO.GetComponent<Bullet>();
+    if (bullet != null)
+    {
+        bullet.SetTarget(target);
+        bullet.damage = damage;
+    }
+}
+
 
     public override void Initialize()
     {
