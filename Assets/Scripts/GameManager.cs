@@ -8,6 +8,7 @@ using UnityEngine.EventSystems;
 using UnityEditor;
 #endif
 #if ENABLE_INPUT_SYSTEM
+using UnityEngine.InputSystem;
 using UnityEngine.InputSystem.UI;
 #endif
 
@@ -44,22 +45,24 @@ public class GameManager : MonoBehaviour
     private bool triedLoadBulletSprite = false;
     private Sprite cachedUiBarSprite;
     [Header("Mana")]
-    [SerializeField] private int startMana = 500;
+    [SerializeField] private int startMana = 1500;
     [SerializeField] private int maxMana = 50000;
-    private int currentMana = 0;
-    private Text manaText;
-    private Image manaFill;
+    private int teamMana = 0;
     private float manaFlashTimer = 0f;
+    private int activePlayerIndex = 0;
 
     private readonly Building[] mainTowers = new Building[4];
     private readonly int[] mainTowerMaxHp = new int[4];
-    private readonly List<TowerStatusRow> towerRows = new List<TowerStatusRow>();
+    private readonly PlayerPanelUI[] playerPanels = new PlayerPanelUI[4];
 
-    private class TowerStatusRow
+    private class PlayerPanelUI
     {
-        public Text label;
-        public Image fill;
-        public Text value;
+        public Image background;
+        public Text title;
+        public Text manaText;
+        public Image manaFill;
+        public Text hpText;
+        public Image hpFill;
     }
 
     // -------------------- LIFECYCLE --------------------
@@ -121,6 +124,9 @@ public class GameManager : MonoBehaviour
     private void Update()
     {
         if (IsGameOver) return;
+
+        UpdateActivePlayerInput();
+
         if (buildingScanInterval <= 0f) return;
 
         if (Time.time >= nextBuildingScanTime)
@@ -238,14 +244,20 @@ public class GameManager : MonoBehaviour
 
     public void RegisterMainTower(int index, Building tower)
     {
-        if (index < 0 || index >= mainTowers.Length) return;
         if (tower == null) return;
+        if (IsMainTower(tower)) return;
 
-        if (mainTowers[index] == null)
+        int slot = GetPanelSlotForTower(tower);
+        if (slot < 0 || slot >= mainTowers.Length)
+            slot = FindFirstEmptyMainTowerSlot();
+        if (slot < 0 || slot >= mainTowers.Length)
+            slot = Mathf.Clamp(index, 0, mainTowers.Length - 1);
+
+        if (mainTowers[slot] == null)
             mainTowersRegisteredCount++;
 
-        mainTowers[index] = tower;
-        mainTowerMaxHp[index] = Mathf.Max(1, tower.hp);
+        mainTowers[slot] = tower;
+        mainTowerMaxHp[slot] = Mathf.Max(1, tower.hp);
         tower.DisableHealthBar();
         UpdateMainTowersUI();
     }
@@ -336,6 +348,8 @@ public class GameManager : MonoBehaviour
             if (mt != null) Destroy(mt.gameObject);
             Transform mp = uiCanvas.transform.Find("ManaPanel");
             if (mp != null) Destroy(mp.gameObject);
+            Transform pp = uiCanvas.transform.Find("PlayerPanels");
+            if (pp != null) Destroy(pp.gameObject);
             return;
         }
 
@@ -343,15 +357,14 @@ public class GameManager : MonoBehaviour
         EnsureBuildingSelector();
         EnsureWeaponPrototypes();
         SetupWeaponPanel();
-        SetupMainTowersPanel();
-        SetupManaPanel();
+        SetupPlayerPanels();
         UpdateMainTowersUI();
     }
 
     private void UpdateHUD()
     {
         if (hudText != null)
-            hudText.text = $"Вышки: {buildings.Count}";
+            hudText.text = $"Осталось зданий: {buildings.Count}";
     }
 
     private void SetupWeaponPanel()
@@ -499,88 +512,53 @@ public class GameManager : MonoBehaviour
         }
     }
 
-    private void SetupManaPanel()
+    private void SetupPlayerPanels()
     {
-        Transform existing = uiCanvas.transform.Find("ManaPanel");
+        Transform existing = uiCanvas.transform.Find("PlayerPanels");
         if (existing != null)
             Destroy(existing.gameObject);
 
-        GameObject panel = CreateUIObject("ManaPanel", uiCanvas.transform);
+        Transform old = uiCanvas.transform.Find("MainTowersPanel");
+        if (old != null) Destroy(old.gameObject);
+        Transform oldMana = uiCanvas.transform.Find("ManaPanel");
+        if (oldMana != null) Destroy(oldMana.gameObject);
+
+        GameObject root = CreateUIObject("PlayerPanels", uiCanvas.transform);
+
+        RectTransform rootRT = root.GetComponent<RectTransform>();
+        rootRT.anchorMin = new Vector2(0.5f, 0.5f);
+        rootRT.anchorMax = new Vector2(0.5f, 0.5f);
+        rootRT.pivot = new Vector2(0.5f, 0.5f);
+        rootRT.anchoredPosition = Vector2.zero;
+        rootRT.sizeDelta = new Vector2(640f, 640f);
+
+        playerPanels[0] = CreatePlayerPanel(root.transform, "P1", new Vector2(0f, 1f), new Vector2(0f, 1f), new Vector2(-380f, 150f));
+        playerPanels[1] = CreatePlayerPanel(root.transform, "P2", new Vector2(0f, 0f), new Vector2(0f, 0f), new Vector2(-380f, -150f));
+        playerPanels[2] = CreatePlayerPanel(root.transform, "P3", new Vector2(1f, 1f), new Vector2(1f, 1f), new Vector2(380f, 150f));
+        playerPanels[3] = CreatePlayerPanel(root.transform, "P4", new Vector2(1f, 0f), new Vector2(1f, 0f), new Vector2(380f, -150f));
+
+        UpdatePlayerPanelHighlight();
+        UpdateManaUI();
+    }
+
+    private PlayerPanelUI CreatePlayerPanel(Transform parent, string title, Vector2 anchor, Vector2 pivot, Vector2 anchoredPos)
+    {
+        GameObject panel = CreateUIObject($"PlayerPanel_{title}", parent);
         Image bg = panel.AddComponent<Image>();
         bg.color = new Color(0.08f, 0.1f, 0.12f, 0.9f);
 
         RectTransform prt = panel.GetComponent<RectTransform>();
-        prt.anchorMin = new Vector2(0.5f, 0f);
-        prt.anchorMax = new Vector2(0.5f, 0f);
-        prt.pivot = new Vector2(0.5f, 0f);
-        prt.anchoredPosition = new Vector2(0f, 20f);
-        prt.sizeDelta = new Vector2(420f, 90f);
-
-        GameObject textGO = CreateUIObject("ManaText", panel.transform);
-        manaText = textGO.AddComponent<Text>();
-        manaText.text = "Мана: 0";
-        manaText.font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
-        manaText.fontSize = 26;
-        manaText.color = Color.white;
-        manaText.alignment = TextAnchor.UpperCenter;
-        manaText.raycastTarget = false;
-
-        RectTransform textRT = textGO.GetComponent<RectTransform>();
-        textRT.anchorMin = new Vector2(0f, 1f);
-        textRT.anchorMax = new Vector2(1f, 1f);
-        textRT.pivot = new Vector2(0.5f, 1f);
-        textRT.anchoredPosition = new Vector2(0f, -10f);
-        textRT.sizeDelta = new Vector2(0f, 30f);
-
-        GameObject barBG = CreateUIObject("ManaBarBG", panel.transform);
-        Image bgImg = barBG.AddComponent<Image>();
-        bgImg.sprite = GetUiBarSprite();
-        bgImg.color = new Color(0.2f, 0.2f, 0.2f, 1f);
-
-        RectTransform barRT = barBG.GetComponent<RectTransform>();
-        barRT.anchorMin = new Vector2(0.1f, 0f);
-        barRT.anchorMax = new Vector2(0.9f, 0f);
-        barRT.pivot = new Vector2(0.5f, 0f);
-        barRT.anchoredPosition = new Vector2(0f, 14f);
-        barRT.sizeDelta = new Vector2(0f, 14f);
-
-        GameObject barFill = CreateUIObject("ManaBarFill", barBG.transform);
-        manaFill = barFill.AddComponent<Image>();
-        manaFill.sprite = GetUiBarSprite();
-        manaFill.type = Image.Type.Filled;
-        manaFill.fillMethod = Image.FillMethod.Horizontal;
-        manaFill.fillOrigin = 0;
-        manaFill.fillAmount = 1f;
-        manaFill.color = new Color(0.25f, 0.8f, 1f, 1f);
-
-        RectTransform fillRT = barFill.GetComponent<RectTransform>();
-        fillRT.anchorMin = Vector2.zero;
-        fillRT.anchorMax = Vector2.one;
-        fillRT.offsetMin = fillRT.offsetMax = Vector2.zero;
-    }
-
-    private void SetupMainTowersPanel()
-    {
-        Transform existing = uiCanvas.transform.Find("MainTowersPanel");
-        if (existing != null)
-            Destroy(existing.gameObject);
-
-        GameObject panel = CreateUIObject("MainTowersPanel", uiCanvas.transform);
-        Image bg = panel.AddComponent<Image>();
-        bg.color = new Color(0.07f, 0.08f, 0.1f, 0.9f);
-
-        RectTransform prt = panel.GetComponent<RectTransform>();
-        prt.anchorMin = new Vector2(1f, 0.5f);
-        prt.anchorMax = new Vector2(1f, 0.5f);
-        prt.pivot = new Vector2(1f, 0.5f);
-        prt.anchoredPosition = new Vector2(-40f, 0f);
-        prt.sizeDelta = new Vector2(520f, 360f);
+        prt.anchorMin = anchor;
+        prt.anchorMax = anchor;
+        prt.pivot = pivot;
+        prt.anchoredPosition = anchoredPos;
+        prt.sizeDelta = new Vector2(260f, 150f);
 
         GameObject titleGO = CreateUIObject("Title", panel.transform);
         Text titleText = titleGO.AddComponent<Text>();
-        titleText.text = "Главные вышки";
+        titleText.text = title;
         titleText.font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
-        titleText.fontSize = 26;
+        titleText.fontSize = 22;
         titleText.color = Color.white;
         titleText.alignment = TextAnchor.UpperLeft;
         titleText.raycastTarget = false;
@@ -589,123 +567,122 @@ public class GameManager : MonoBehaviour
         titleRT.anchorMin = new Vector2(0f, 1f);
         titleRT.anchorMax = new Vector2(1f, 1f);
         titleRT.pivot = new Vector2(0f, 1f);
-        titleRT.anchoredPosition = new Vector2(16f, -12f);
-        titleRT.sizeDelta = new Vector2(-32f, 36f);
+        titleRT.anchoredPosition = new Vector2(12f, -8f);
+        titleRT.sizeDelta = new Vector2(-24f, 24f);
 
-        GameObject rowsRoot = CreateUIObject("Rows", panel.transform);
-        RectTransform rowsRT = rowsRoot.GetComponent<RectTransform>();
-        rowsRT.anchorMin = new Vector2(0f, 0f);
-        rowsRT.anchorMax = new Vector2(1f, 1f);
-        rowsRT.pivot = new Vector2(0.5f, 0.5f);
-        rowsRT.offsetMin = new Vector2(24f, 24f);
-        rowsRT.offsetMax = new Vector2(-24f, -70f);
+        GameObject manaTextGO = CreateUIObject("ManaText", panel.transform);
+        Text manaText = manaTextGO.AddComponent<Text>();
+        manaText.text = "mana 0";
+        manaText.font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
+        manaText.fontSize = 18;
+        manaText.color = Color.white;
+        manaText.alignment = TextAnchor.UpperLeft;
+        manaText.raycastTarget = false;
 
-        var vlg = rowsRoot.AddComponent<VerticalLayoutGroup>();
-        vlg.childAlignment = TextAnchor.UpperLeft;
-        vlg.spacing = 14f;
-        vlg.childControlWidth = true;
-        vlg.childControlHeight = false;
-        vlg.childForceExpandWidth = true;
-        vlg.childForceExpandHeight = false;
+        RectTransform manaTextRT = manaTextGO.GetComponent<RectTransform>();
+        manaTextRT.anchorMin = new Vector2(0f, 1f);
+        manaTextRT.anchorMax = new Vector2(1f, 1f);
+        manaTextRT.pivot = new Vector2(0f, 1f);
+        manaTextRT.anchoredPosition = new Vector2(12f, -36f);
+        manaTextRT.sizeDelta = new Vector2(-24f, 20f);
 
-        towerRows.Clear();
-        for (int i = 0; i < mainTowers.Length; i++)
+        GameObject manaBarBG = CreateUIObject("ManaBarBG", panel.transform);
+        Image manaBgImg = manaBarBG.AddComponent<Image>();
+        manaBgImg.sprite = GetUiBarSprite();
+        manaBgImg.color = new Color(0.2f, 0.2f, 0.2f, 1f);
+
+        RectTransform manaBarRT = manaBarBG.GetComponent<RectTransform>();
+        manaBarRT.anchorMin = new Vector2(0f, 1f);
+        manaBarRT.anchorMax = new Vector2(1f, 1f);
+        manaBarRT.pivot = new Vector2(0.5f, 1f);
+        manaBarRT.anchoredPosition = new Vector2(0f, -58f);
+        manaBarRT.sizeDelta = new Vector2(-24f, 12f);
+        manaBarRT.offsetMin = new Vector2(12f, manaBarRT.offsetMin.y);
+        manaBarRT.offsetMax = new Vector2(-12f, manaBarRT.offsetMax.y);
+
+        GameObject manaFillGO = CreateUIObject("ManaFill", manaBarBG.transform);
+        Image manaFill = manaFillGO.AddComponent<Image>();
+        manaFill.sprite = GetUiBarSprite();
+        manaFill.type = Image.Type.Filled;
+        manaFill.fillMethod = Image.FillMethod.Horizontal;
+        manaFill.fillOrigin = 0;
+        manaFill.fillAmount = 1f;
+        manaFill.color = new Color(0.25f, 0.8f, 1f, 1f);
+
+        RectTransform manaFillRT = manaFillGO.GetComponent<RectTransform>();
+        manaFillRT.anchorMin = Vector2.zero;
+        manaFillRT.anchorMax = Vector2.one;
+        manaFillRT.offsetMin = manaFillRT.offsetMax = Vector2.zero;
+
+        GameObject hpTextGO = CreateUIObject("HpText", panel.transform);
+        Text hpText = hpTextGO.AddComponent<Text>();
+        hpText.text = "hp 0";
+        hpText.font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
+        hpText.fontSize = 18;
+        hpText.color = Color.white;
+        hpText.alignment = TextAnchor.UpperLeft;
+        hpText.raycastTarget = false;
+
+        RectTransform hpTextRT = hpTextGO.GetComponent<RectTransform>();
+        hpTextRT.anchorMin = new Vector2(0f, 1f);
+        hpTextRT.anchorMax = new Vector2(1f, 1f);
+        hpTextRT.pivot = new Vector2(0f, 1f);
+        hpTextRT.anchoredPosition = new Vector2(12f, -82f);
+        hpTextRT.sizeDelta = new Vector2(-24f, 20f);
+
+        GameObject hpBarBG = CreateUIObject("HpBarBG", panel.transform);
+        Image hpBgImg = hpBarBG.AddComponent<Image>();
+        hpBgImg.sprite = GetUiBarSprite();
+        hpBgImg.color = new Color(0.2f, 0.2f, 0.2f, 1f);
+
+        RectTransform hpBarRT = hpBarBG.GetComponent<RectTransform>();
+        hpBarRT.anchorMin = new Vector2(0f, 1f);
+        hpBarRT.anchorMax = new Vector2(1f, 1f);
+        hpBarRT.pivot = new Vector2(0.5f, 1f);
+        hpBarRT.anchoredPosition = new Vector2(0f, -104f);
+        hpBarRT.sizeDelta = new Vector2(-24f, 12f);
+        hpBarRT.offsetMin = new Vector2(12f, hpBarRT.offsetMin.y);
+        hpBarRT.offsetMax = new Vector2(-12f, hpBarRT.offsetMax.y);
+
+        GameObject hpFillGO = CreateUIObject("HpFill", hpBarBG.transform);
+        Image hpFill = hpFillGO.AddComponent<Image>();
+        hpFill.sprite = GetUiBarSprite();
+        hpFill.type = Image.Type.Filled;
+        hpFill.fillMethod = Image.FillMethod.Horizontal;
+        hpFill.fillOrigin = 0;
+        hpFill.fillAmount = 1f;
+        hpFill.color = new Color(0.2f, 0.9f, 0.4f, 1f);
+
+        RectTransform hpFillRT = hpFillGO.GetComponent<RectTransform>();
+        hpFillRT.anchorMin = Vector2.zero;
+        hpFillRT.anchorMax = Vector2.one;
+        hpFillRT.offsetMin = hpFillRT.offsetMax = Vector2.zero;
+
+        return new PlayerPanelUI
         {
-            TowerStatusRow row = CreateTowerRow(rowsRoot.transform, $"Вышка {i + 1}");
-            towerRows.Add(row);
-        }
-    }
-
-    private TowerStatusRow CreateTowerRow(Transform parent, string label)
-    {
-        GameObject rowGO = CreateUIObject(label.Replace(" ", "_"), parent);
-        var rowLayout = rowGO.AddComponent<HorizontalLayoutGroup>();
-        rowLayout.childAlignment = TextAnchor.MiddleLeft;
-        rowLayout.spacing = 10f;
-        rowLayout.childControlHeight = false;
-        rowLayout.childControlWidth = false;
-        rowLayout.childForceExpandWidth = false;
-        rowLayout.childForceExpandHeight = false;
-
-        var rowLE = rowGO.AddComponent<LayoutElement>();
-        rowLE.preferredHeight = 44f;
-
-        GameObject labelGO = CreateUIObject("Label", rowGO.transform);
-        Text labelText = labelGO.AddComponent<Text>();
-        labelText.text = label;
-        labelText.font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
-        labelText.fontSize = 20;
-        labelText.color = Color.white;
-        labelText.alignment = TextAnchor.MiddleLeft;
-        labelText.raycastTarget = false;
-
-        var labelLE = labelGO.AddComponent<LayoutElement>();
-        labelLE.preferredWidth = 120f;
-
-        Sprite uiSprite = GetUiBarSprite();
-
-        GameObject barBG = CreateUIObject("BarBG", rowGO.transform);
-        Image barBGImg = barBG.AddComponent<Image>();
-        barBGImg.sprite = uiSprite;
-        barBGImg.color = new Color(0.2f, 0.2f, 0.2f, 1f);
-
-        var barLE = barBG.AddComponent<LayoutElement>();
-        barLE.preferredWidth = 220f;
-        barLE.preferredHeight = 14f;
-
-        RectTransform barRT = barBG.GetComponent<RectTransform>();
-        barRT.sizeDelta = new Vector2(220f, 14f);
-
-        GameObject barFill = CreateUIObject("BarFill", barBG.transform);
-        Image fillImg = barFill.AddComponent<Image>();
-        fillImg.sprite = uiSprite;
-        fillImg.type = Image.Type.Filled;
-        fillImg.fillMethod = Image.FillMethod.Horizontal;
-        fillImg.fillOrigin = 0;
-        fillImg.fillAmount = 1f;
-        fillImg.color = new Color(0.2f, 0.9f, 0.4f, 1f);
-
-        RectTransform fillRT = barFill.GetComponent<RectTransform>();
-        fillRT.anchorMin = Vector2.zero;
-        fillRT.anchorMax = Vector2.one;
-        fillRT.offsetMin = fillRT.offsetMax = Vector2.zero;
-
-        GameObject valueGO = CreateUIObject("Value", rowGO.transform);
-        Text valueText = valueGO.AddComponent<Text>();
-        valueText.text = "0";
-        valueText.font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
-        valueText.fontSize = 20;
-        valueText.color = Color.white;
-        valueText.alignment = TextAnchor.MiddleRight;
-        valueText.raycastTarget = false;
-
-        var valueLE = valueGO.AddComponent<LayoutElement>();
-        valueLE.preferredWidth = 70f;
-
-        return new TowerStatusRow
-        {
-            label = labelText,
-            fill = fillImg,
-            value = valueText
+            background = bg,
+            title = titleText,
+            manaText = manaText,
+            manaFill = manaFill,
+            hpText = hpText,
+            hpFill = hpFill
         };
     }
 
     private void UpdateMainTowersUI()
     {
-        if (towerRows.Count == 0) return;
-
-        for (int i = 0; i < towerRows.Count; i++)
+        for (int i = 0; i < mainTowers.Length; i++)
         {
-            TowerStatusRow row = towerRows[i];
-            Building tower = (i < mainTowers.Length) ? mainTowers[i] : null;
+            PlayerPanelUI panel = playerPanels[i];
+            if (panel == null) continue;
+
+            Building tower = mainTowers[i];
             int maxHp = (i < mainTowerMaxHp.Length) ? mainTowerMaxHp[i] : 1;
 
             if (tower == null)
             {
-                row.value.text = "0";
-                row.fill.fillAmount = 0f;
-                row.label.color = new Color(0.7f, 0.7f, 0.7f, 1f);
-                row.value.color = new Color(0.7f, 0.7f, 0.7f, 1f);
+                if (panel.hpText != null) panel.hpText.text = "hp 0";
+                if (panel.hpFill != null) panel.hpFill.fillAmount = 0f;
                 continue;
             }
 
@@ -718,30 +695,29 @@ public class GameManager : MonoBehaviour
             }
 
             float t = (float)currentHp / Mathf.Max(1, maxHp);
-            row.fill.fillAmount = t;
-            row.value.text = currentHp.ToString();
-            row.label.color = Color.white;
-            row.value.color = Color.white;
+            if (panel.hpFill != null) panel.hpFill.fillAmount = t;
+            if (panel.hpText != null) panel.hpText.text = $"hp {currentHp}";
         }
     }
 
     private void ResetMana()
     {
-        currentMana = Mathf.Clamp(startMana, 0, maxMana);
+        teamMana = Mathf.Clamp(startMana, 0, maxMana);
+        manaFlashTimer = 0f;
         UpdateManaUI();
     }
 
     public bool TrySpendMana(int amount)
     {
         if (amount <= 0) return true;
-        if (currentMana < amount)
+        if (teamMana < amount)
         {
             manaFlashTimer = 0.6f;
             UpdateManaUI();
             return false;
         }
 
-        currentMana -= amount;
+        teamMana -= amount;
         UpdateManaUI();
         return true;
     }
@@ -749,30 +725,149 @@ public class GameManager : MonoBehaviour
     public void AddMana(int amount)
     {
         if (amount <= 0) return;
-        currentMana = Mathf.Clamp(currentMana + amount, 0, maxMana);
+        teamMana = Mathf.Clamp(teamMana + amount, 0, maxMana);
         UpdateManaUI();
+    }
+
+    public void AddManaToPlayer(int index, int amount)
+    {
+        AddMana(amount);
     }
 
     private void UpdateManaUI()
     {
-        if (manaText != null)
-            manaText.text = $"Мана: {currentMana}";
-        if (manaFill != null)
-            manaFill.fillAmount = (float)currentMana / Mathf.Max(1, maxMana);
+        for (int i = 0; i < playerPanels.Length; i++)
+        {
+            PlayerPanelUI panel = playerPanels[i];
+            if (panel == null) continue;
+            if (panel.manaText != null)
+                panel.manaText.text = $"mana {teamMana}";
+            if (panel.manaFill != null)
+                panel.manaFill.fillAmount = (float)teamMana / Mathf.Max(1, maxMana);
+        }
     }
 
     private void UpdateManaFlash()
     {
-        if (manaText == null) return;
-        if (manaFlashTimer > 0f)
+        for (int i = 0; i < playerPanels.Length; i++)
         {
-            manaFlashTimer -= Time.deltaTime;
-            manaText.color = Color.Lerp(Color.white, new Color(1f, 0.4f, 0.4f, 1f), 0.6f);
+            PlayerPanelUI panel = playerPanels[i];
+            if (panel == null || panel.manaText == null) continue;
+
+            if (manaFlashTimer > 0f)
+            {
+                manaFlashTimer -= Time.deltaTime;
+                panel.manaText.color = Color.Lerp(Color.white, new Color(1f, 0.4f, 0.4f, 1f), 0.6f);
+            }
+            else
+            {
+                panel.manaText.color = Color.white;
+            }
         }
-        else
+    }
+
+    public bool IsMainTower(Building b)
+    {
+        if (b == null) return false;
+        for (int i = 0; i < mainTowers.Length; i++)
         {
-            manaText.color = Color.white;
+            if (mainTowers[i] == b) return true;
         }
+        return false;
+    }
+
+    public bool IsShotBlockedByMainTower(Vector2 from, Vector2 to, Transform ignore)
+    {
+        RaycastHit2D[] hits = Physics2D.LinecastAll(from, to);
+        for (int i = 0; i < hits.Length; i++)
+        {
+            Collider2D col = hits[i].collider;
+            if (col == null) continue;
+
+            Transform hitTransform = col.transform;
+            if (ignore != null && (hitTransform == ignore || hitTransform.IsChildOf(ignore)))
+                continue;
+
+            Building b = col.GetComponent<Building>() ?? col.GetComponentInParent<Building>();
+            if (b != null && IsMainTower(b))
+                return true;
+        }
+        return false;
+    }
+
+    public int ActivePlayerIndex => activePlayerIndex;
+
+    private void UpdateActivePlayerInput()
+    {
+#if ENABLE_INPUT_SYSTEM
+        var kb = Keyboard.current;
+        if (kb == null) return;
+        if (kb.digit1Key.wasPressedThisFrame) SetActivePlayer(0);
+        if (kb.digit2Key.wasPressedThisFrame) SetActivePlayer(1);
+        if (kb.digit3Key.wasPressedThisFrame) SetActivePlayer(2);
+        if (kb.digit4Key.wasPressedThisFrame) SetActivePlayer(3);
+#else
+        if (Input.GetKeyDown(KeyCode.Alpha1)) SetActivePlayer(0);
+        if (Input.GetKeyDown(KeyCode.Alpha2)) SetActivePlayer(1);
+        if (Input.GetKeyDown(KeyCode.Alpha3)) SetActivePlayer(2);
+        if (Input.GetKeyDown(KeyCode.Alpha4)) SetActivePlayer(3);
+#endif
+    }
+
+    private void SetActivePlayer(int index)
+    {
+        if (index < 0 || index >= playerPanels.Length) return;
+        if (activePlayerIndex == index) return;
+        activePlayerIndex = index;
+        UpdatePlayerPanelHighlight();
+    }
+
+    private void UpdatePlayerPanelHighlight()
+    {
+        Color baseColor = new Color(0.08f, 0.1f, 0.12f, 0.9f);
+        Color activeColor = new Color(0.12f, 0.15f, 0.2f, 0.95f);
+
+        for (int i = 0; i < playerPanels.Length; i++)
+        {
+            PlayerPanelUI panel = playerPanels[i];
+            if (panel == null || panel.background == null) continue;
+            panel.background.color = (i == activePlayerIndex) ? activeColor : baseColor;
+        }
+    }
+
+    private int FindFirstEmptyMainTowerSlot()
+    {
+        for (int i = 0; i < mainTowers.Length; i++)
+        {
+            if (mainTowers[i] == null) return i;
+        }
+        return -1;
+    }
+
+    private int GetPanelSlotForTower(Building tower)
+    {
+        Vector2 center = GetGridCenter();
+        Vector2 pos = tower.transform.position;
+        bool left = pos.x <= center.x;
+        bool top = pos.y >= center.y;
+
+        if (top && left) return 0;      // P1
+        if (!top && left) return 1;     // P2
+        if (top && !left) return 2;     // P3
+        return 3;                       // P4
+    }
+
+    private Vector2 GetGridCenter()
+    {
+        GridGenerator grid = FindObjectOfType<GridGenerator>();
+        if (grid == null) return Vector2.zero;
+
+        Transform c00 = grid.transform.Find("Cell_0_0");
+        Transform cmax = grid.transform.Find($"Cell_{grid.width - 1}_{grid.height - 1}");
+        if (c00 != null && cmax != null)
+            return (c00.position + cmax.position) * 0.5f;
+
+        return grid.transform.position;
     }
 
     private void EnsureBuildingSelector()

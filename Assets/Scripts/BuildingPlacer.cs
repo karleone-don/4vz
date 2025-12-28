@@ -84,7 +84,7 @@ public class BuildingPlacer : MonoBehaviour
         {
             Debug.LogWarning("BuildingPlacer: Instantiated object doesn't contain Building component.");
             if (GameManager.Instance != null && cost > 0)
-                GameManager.Instance.AddMana(cost);
+                GameManager.Instance.AddManaToPlayer(GameManager.Instance.ActivePlayerIndex, cost);
             Destroy(obj);
             return;
         }

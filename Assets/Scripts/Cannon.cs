@@ -57,6 +57,13 @@ public class Cannon : Building
             fireTimer <= 0f && 
             IsAimedAtTarget())
         {
+            if (GameManager.Instance != null)
+            {
+                Vector2 from = muzzle != null ? (Vector2)muzzle.position : (Vector2)transform.position;
+                Vector2 to = currentTarget.position;
+                if (GameManager.Instance.IsShotBlockedByMainTower(from, to, transform))
+                    return;
+            }
             Fire(currentTarget);
             fireTimer = fireCooldown;
         }

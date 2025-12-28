@@ -62,6 +62,14 @@ public class Shotgun : Building
         if (!IsAligned(currentTarget.position, out isVertical))
             return;
 
+        if (GameManager.Instance != null)
+        {
+            Vector2 from = muzzle != null ? (Vector2)muzzle.position : (Vector2)transform.position;
+            Vector2 to = currentTarget.position;
+            if (GameManager.Instance.IsShotBlockedByMainTower(from, to, transform))
+                return;
+        }
+
         List<Enemy> candidates = FindEnemiesInAxisSpread(currentTarget.position, isVertical);
         if (candidates.Count == 0 && target != null)
             candidates.Add(target);
