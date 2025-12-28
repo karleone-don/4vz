@@ -42,7 +42,7 @@ public class EnemyMover : MonoBehaviour
         FaceTargetImmediate();
     }
 
-    void Update()
+    protected virtual void Update()
     {
         if (!initialized) return;
 

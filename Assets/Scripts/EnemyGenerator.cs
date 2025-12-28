@@ -3,7 +3,17 @@ using UnityEngine;
 public class EnemyGenerator : MonoBehaviour
 {
     public GameObject enemyPrefab;
-    public float spawnInterval = 1f;
+    public GameObject fastZombiePrefab;
+    public GameObject tankZombiePrefab;
+    [Tooltip("Шанс появления FastZombie (0..1)")]
+    public float fastChance = 0.15f;
+    [Tooltip("Шанс появления TankZombie (0..1)")]
+    public float tankChance = 0.05f;
+    [Header("Waves")]
+    public int startWaveSize = 6;
+    public int waveSizeIncrease = 2;
+    public float spawnInterval = 0.8f;
+    public float timeBetweenWaves = 6f;
     public GridGenerator grid;
     public int borderOffset = 2; // расстояние n от сетки
 
@@ -48,14 +58,32 @@ public class EnemyGenerator : MonoBehaviour
                                     gridPos.y - offsetY + (grid.cellSize * scaleX) / 2f);
         }
 
-        if (enemyPrefab == null)
+        if (enemyPrefab == null && fastZombiePrefab == null && tankZombiePrefab == null)
         {
-            Debug.LogError("EnemyGenerator: enemyPrefab не назначен в инспекторе.");
+            Debug.LogError("EnemyGenerator: ни один префаб врага не назначен в инспекторе.");
             enabled = false;
             return;
         }
 
-        InvokeRepeating(nameof(SpawnEnemy), 0f, spawnInterval);
+        StartCoroutine(WaveLoop());
+    }
+
+    private System.Collections.IEnumerator WaveLoop()
+    {
+        int wave = 0;
+        while (true)
+        {
+            wave++;
+            int count = startWaveSize + (wave - 1) * waveSizeIncrease;
+
+            for (int i = 0; i < count; i++)
+            {
+                SpawnEnemy();
+                yield return new WaitForSeconds(spawnInterval);
+            }
+
+            yield return new WaitForSeconds(timeBetweenWaves);
+        }
     }
 
     void SpawnEnemy()
@@ -64,8 +92,55 @@ public class EnemyGenerator : MonoBehaviour
         int side; // 0=Left,1=Right,2=Bottom,3=Top
         GetRandomBorderPosition(out spawnPos, out side);
 
-        GameObject enemyObj = Instantiate(enemyPrefab, spawnPos, Quaternion.identity);
+        // Выбираем тип врага (0=default,1=fast,2=tank) по шансам
+        int chosenType = 0;
+        float r = Random.value;
+        if (r < fastChance) chosenType = 1;
+        else if (r < fastChance + tankChance) chosenType = 2;
+
+        // Если для выбранного типа есть отдельный префаб — используем его, иначе будем инстанцировать базовый префаб и заменять компонент на нужный тип
+        GameObject prefabToSpawn = enemyPrefab;
+        if (chosenType == 1 && fastZombiePrefab != null) prefabToSpawn = fastZombiePrefab;
+        else if (chosenType == 2 && tankZombiePrefab != null) prefabToSpawn = tankZombiePrefab;
+
+        GameObject enemyObj = Instantiate(prefabToSpawn, spawnPos, Quaternion.identity);
+
+        Debug.Log($"EnemyGenerator: spawned type={chosenType} prefab={(prefabToSpawn!=null?prefabToSpawn.name:"<null>")} at {spawnPos}");
+
+        // Если инстанцировали конкретный префаб, то просто инициализируем
         Enemy enemy = enemyObj.GetComponent<Enemy>();
+        if (enemy != null && ((chosenType == 0) ||
+            (chosenType == 1 && prefabToSpawn == fastZombiePrefab) ||
+            (chosenType == 2 && prefabToSpawn == tankZombiePrefab)))
+        {
+            enemy.Initialize(grid, side);
+            enemy.SetupEnemy();
+            return;
+        }
+
+        // Иначе — мы инстанцировали базовый префаб, но хотим, чтобы модель и визуал был как у базового, а логика — у Fast/Tank
+        if (chosenType == 1)
+        {
+            // Заменяем компонент Enemy на FastZombie
+            Enemy existing = enemyObj.GetComponent<Enemy>();
+            if (existing != null) Destroy(existing);
+            FastZombie f = enemyObj.AddComponent<FastZombie>();
+            f.Initialize(grid, side);
+            f.SetupEnemy();
+            return;
+        }
+
+        if (chosenType == 2)
+        {
+            Enemy existing = enemyObj.GetComponent<Enemy>();
+            if (existing != null) Destroy(existing);
+            TankZombie t = enemyObj.AddComponent<TankZombie>();
+            t.Initialize(grid, side);
+            t.SetupEnemy();
+            return;
+        }
+
+        // fallback: если ни один компонент не был найден/добавлен — предупреждение
         if (enemy != null)
         {
             enemy.Initialize(grid, side);
@@ -73,7 +148,7 @@ public class EnemyGenerator : MonoBehaviour
         }
         else
         {
-            Debug.LogWarning("Префаб врага не содержит EnemyMover — движение не будет работать.");
+            Debug.LogWarning("Префаб врага не содержит Enemy — движение не будет работать.");
         }
     }
 

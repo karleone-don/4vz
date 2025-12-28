@@ -23,6 +23,11 @@ public class Cannon : Building
         energyCost = 5;
         price = 50;
 
+        // ensure healthbar immediately
+        EnsureHealthBar();
+        RefreshHealthBar();
+        Debug.Log($"Cannon.Awake refreshed healthbar for '{gameObject.name}' hp={hp}");
+
         if (turret == null)
             turret = transform;
         if (muzzle == null)
@@ -136,6 +141,8 @@ public class Cannon : Building
 
     // Создаём снаряд
     GameObject bulletGO = Instantiate(bulletPrefab, muzzle.position, muzzle.rotation);
+    if (!bulletGO.activeSelf)
+        bulletGO.SetActive(true);
     Bullet bullet = bulletGO.GetComponent<Bullet>();
     if (bullet != null)
     {

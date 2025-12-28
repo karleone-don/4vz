@@ -11,5 +11,9 @@ public class Tower : Building
         damage = 20;
         energyCost = 5;
         price = 50;
+        // ensure and refresh healthbar now that hp is set
+        EnsureHealthBar();
+        RefreshHealthBar();
+        Debug.Log($"Tower.Initialize refreshed healthbar for '{gameObject.name}' hp={hp}");
     }
 }

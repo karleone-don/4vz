@@ -7,6 +7,7 @@ public class Zombie : Enemy
         hp = 100;
         damage = 20;
         speed = 0.5f; // наследуемая переменная из EnemyMover
+        manaReward = 30;
     }
 
     void Start()

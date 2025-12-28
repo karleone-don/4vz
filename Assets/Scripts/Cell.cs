@@ -39,11 +39,13 @@ public class Cell : MonoBehaviour
     // установка здания на клетку
     public void PlaceBuilding(Building building)
     {
+        
         if (IsFree)
         {
             buildingOnCell = building;
             building.transform.position = transform.position;
             building.transform.SetParent(transform);
+            Debug.Log($"Placed building '{building.name}' on cell {x},{y}");
         }
         else
         {
