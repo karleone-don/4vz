@@ -96,6 +96,7 @@ public class GameManager : MonoBehaviour
         UpdateHUD();
         SetupGameplayUI();
         ResetMana();
+        UpdateHudVisibility();
     }
 
     private void OnSceneLoaded(Scene scene, LoadSceneMode mode)
@@ -119,6 +120,7 @@ public class GameManager : MonoBehaviour
         mainTowersRegisteredCount = 0;
         SetupGameplayUI();
         ResetMana();
+        UpdateHudVisibility();
     }
 
     private void Update()
@@ -335,6 +337,8 @@ public class GameManager : MonoBehaviour
         {
             hudText = hudGO.GetComponent<Text>();
         }
+
+        UpdateHudVisibility();
     }
 
     private void SetupGameplayUI()
@@ -365,6 +369,13 @@ public class GameManager : MonoBehaviour
     {
         if (hudText != null)
             hudText.text = $"Осталось зданий: {buildings.Count}";
+    }
+
+    private void UpdateHudVisibility()
+    {
+        if (hudText == null) return;
+        bool inGameScene = SceneManager.GetActiveScene().name == gameSceneName;
+        hudText.gameObject.SetActive(inGameScene);
     }
 
     private void SetupWeaponPanel()

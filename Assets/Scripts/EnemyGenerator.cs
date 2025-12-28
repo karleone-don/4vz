@@ -9,6 +9,8 @@ public class EnemyGenerator : MonoBehaviour
     public float fastChance = 0.15f;
     [Tooltip("Шанс появления TankZombie (0..1)")]
     public float tankChance = 0.05f;
+    [Tooltip("Минимум TankZombie на волну (0 = без гарантии)")]
+    public int minTankPerWave = 1;
     [Header("Waves")]
     public int startWaveSize = 6;
     public int waveSizeIncrease = 2;
@@ -75,10 +77,18 @@ public class EnemyGenerator : MonoBehaviour
         {
             wave++;
             int count = startWaveSize + (wave - 1) * waveSizeIncrease;
+            int tanksLeft = Mathf.Max(0, minTankPerWave);
 
             for (int i = 0; i < count; i++)
             {
-                SpawnEnemy();
+                int forcedType = 0;
+                if (tanksLeft > 0 && (count - i) <= tanksLeft)
+                {
+                    forcedType = 2;
+                    tanksLeft--;
+                }
+
+                SpawnEnemy(forcedType);
                 yield return new WaitForSeconds(spawnInterval);
             }
 
@@ -86,7 +96,7 @@ public class EnemyGenerator : MonoBehaviour
         }
     }
 
-    void SpawnEnemy()
+    void SpawnEnemy(int forcedType = 0)
     {
         Vector2 spawnPos;
         int side; // 0=Left,1=Right,2=Bottom,3=Top
@@ -94,9 +104,16 @@ public class EnemyGenerator : MonoBehaviour
 
         // Выбираем тип врага (0=default,1=fast,2=tank) по шансам
         int chosenType = 0;
-        float r = Random.value;
-        if (r < fastChance) chosenType = 1;
-        else if (r < fastChance + tankChance) chosenType = 2;
+        if (forcedType == 2)
+        {
+            chosenType = 2;
+        }
+        else
+        {
+            float r = Random.value;
+            if (r < fastChance) chosenType = 1;
+            else if (r < fastChance + tankChance) chosenType = 2;
+        }
 
         // Если для выбранного типа есть отдельный префаб — используем его, иначе будем инстанцировать базовый префаб и заменять компонент на нужный тип
         GameObject prefabToSpawn = enemyPrefab;
