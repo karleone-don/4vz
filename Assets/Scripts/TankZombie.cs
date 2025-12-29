@@ -3,7 +3,7 @@ using UnityEngine;
 public class TankZombie : Enemy
 {
     // Медленный, но живучий зомби
-    public float moveSpeed = 1.5f;
+    public float moveSpeed = 0.6f;
     [Header("Visual")]
     [SerializeField] private string moveSpriteResourceFolder = "zombie_tank";
     [SerializeField] private float moveAnimFrameTime = 0.06f;

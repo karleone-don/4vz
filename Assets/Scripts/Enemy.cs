@@ -11,6 +11,13 @@ public abstract class Enemy : EnemyMover
     public int hp;
     public int damage;
     public int manaReward = 25;
+    
+    [Header("Scaling")]
+    [SerializeField] public float hpScalingPerWave = 0.1f; // увеличение HP на 10% за волну
+    [SerializeField] public float damageScalingPerWave = 0.05f; // увеличение урона на 5% за волну
+    
+    private int baseHp;
+    private int baseDamage;
     private HealthBar healthBar;
     private bool rewardGiven = false;
 
@@ -39,6 +46,25 @@ public abstract class Enemy : EnemyMover
 
     // Этот метод будет вызываться при создании врага
     public abstract void SetupEnemy();
+    
+    // Применить масштабирование HP и урона на основе номера волны
+    public void ApplyWaveScaling(int waveNumber)
+    {
+        if (waveNumber <= 1) return;
+        
+        // Сохраняем базовые значения при первом вызове
+        if (baseHp == 0) baseHp = hp;
+        if (baseDamage == 0) baseDamage = damage;
+        
+        // Применяем масштабирование
+        float hpMultiplier = 1f + (hpScalingPerWave * (waveNumber - 1));
+        float damageMultiplier = 1f + (damageScalingPerWave * (waveNumber - 1));
+        
+        hp = Mathf.CeilToInt(baseHp * hpMultiplier);
+        damage = Mathf.CeilToInt(baseDamage * damageMultiplier);
+        
+        Debug.Log($"{name} (волна {waveNumber}): HP={hp} (базовое {baseHp}), Урон={damage} (базовый {baseDamage})");
+    }
 
     // метод получения урона
     public void TakeDamage(int dmg)

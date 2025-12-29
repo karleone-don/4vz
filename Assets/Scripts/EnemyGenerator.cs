@@ -21,6 +21,7 @@ public class EnemyGenerator : MonoBehaviour
 
     private Vector2 cell00Pos;
     private float cellStep;
+    private int currentWave = 0;
 
     void Start()
     {
@@ -81,6 +82,7 @@ public class EnemyGenerator : MonoBehaviour
         while (true)
         {
             wave++;
+            currentWave = wave;
             int count = startWaveSize + (wave - 1) * waveSizeIncrease;
             int tanksLeft = Mathf.Max(0, minTankPerWave);
 
@@ -93,7 +95,7 @@ public class EnemyGenerator : MonoBehaviour
                     tanksLeft--;
                 }
 
-                SpawnEnemy(forcedType);
+                SpawnEnemy(forcedType, wave);
                 yield return new WaitForSeconds(spawnInterval);
             }
 
@@ -101,20 +103,32 @@ public class EnemyGenerator : MonoBehaviour
         }
     }
 
-    void SpawnEnemy(int forcedType = 0)
+    void SpawnEnemy(int forcedType = 0, int waveNumber = 1)
     {
         Vector2 spawnPos;
         int side; // 0=Left,1=Right,2=Bottom,3=Top
         GetRandomBorderPosition(out spawnPos, out side);
 
-        // Выбираем тип врага (0=default,1=fast,2=tank) по шансам
+        // Выбираем тип врага (0=default,1=fast,2=tank) в зависимости от волны
         int chosenType = 0;
         if (forcedType == 2)
         {
             chosenType = 2;
         }
+        else if (waveNumber == 1)
+        {
+            // Волна 1: только базовые зомби
+            chosenType = 0;
+        }
+        else if (waveNumber == 2)
+        {
+            // Волна 2: зомби и танки
+            float r = Random.value;
+            chosenType = r < tankChance ? 2 : 0;
+        }
         else
         {
+            // Волна 3+: все типы врагов
             float r = Random.value;
             if (r < fastChance) chosenType = 1;
             else if (r < fastChance + tankChance) chosenType = 2;
@@ -137,6 +151,7 @@ public class EnemyGenerator : MonoBehaviour
         {
             enemy.Initialize(grid, side);
             enemy.SetupEnemy();
+            enemy.ApplyWaveScaling(waveNumber);
             return;
         }
 
@@ -149,6 +164,7 @@ public class EnemyGenerator : MonoBehaviour
             FastZombie f = enemyObj.AddComponent<FastZombie>();
             f.Initialize(grid, side);
             f.SetupEnemy();
+            f.ApplyWaveScaling(waveNumber);
             return;
         }
 
@@ -159,6 +175,7 @@ public class EnemyGenerator : MonoBehaviour
             TankZombie t = enemyObj.AddComponent<TankZombie>();
             t.Initialize(grid, side);
             t.SetupEnemy();
+            t.ApplyWaveScaling(waveNumber);
             return;
         }
 
@@ -167,6 +184,7 @@ public class EnemyGenerator : MonoBehaviour
         {
             enemy.Initialize(grid, side);
             enemy.SetupEnemy();
+            enemy.ApplyWaveScaling(waveNumber);
         }
         else
         {

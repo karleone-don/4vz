@@ -3,7 +3,7 @@ using UnityEngine;
 public class FastZombie : Enemy
 {
     // Быстрый, но хрупкий зомби
-    public float moveSpeed = 4f;
+    public float moveSpeed = 1.5f;
     [Header("Visual")]
     [SerializeField] private string moveSpriteResourceFolder = "zombie_soldier";
     [SerializeField] private float moveAnimFrameTime = 0.06f;

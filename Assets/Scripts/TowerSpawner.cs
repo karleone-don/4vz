@@ -21,10 +21,10 @@ public class TowerSpawner : MonoBehaviour
     [Header("Tower Grid Positions")]
     public Vector2Int[] towerGridPositions =
     {
-        new Vector2Int(2,2),
-        new Vector2Int(2,5),
-        new Vector2Int(5,2),
-        new Vector2Int(5,5)
+        new Vector2Int(3,3),
+        new Vector2Int(3,4),
+        new Vector2Int(4,3),
+        new Vector2Int(4,4)
     };
 
     private GameObject[] spawnedMice;
