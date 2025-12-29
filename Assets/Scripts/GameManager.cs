@@ -46,14 +46,15 @@ public class GameManager : MonoBehaviour
     private Sprite cachedUiBarSprite;
     [Header("Mana")]
     [SerializeField] private int startMana = 1500;
-    [SerializeField] private int maxMana = 50000;
-    private int teamMana = 0;
-    private float manaFlashTimer = 0f;
+    [SerializeField] private int maxMana = 5000;
+    private readonly int[] playerMana = new int[4];
+    private readonly float[] manaFlashTimers = new float[4];
     private int activePlayerIndex = 0;
 
     private readonly Building[] mainTowers = new Building[4];
     private readonly int[] mainTowerMaxHp = new int[4];
     private readonly PlayerPanelUI[] playerPanels = new PlayerPanelUI[4];
+    private bool gameplayUiReady = false;
 
     private class PlayerPanelUI
     {
@@ -127,6 +128,7 @@ public class GameManager : MonoBehaviour
     {
         if (IsGameOver) return;
 
+        EnsureGameplayUi();
         UpdateActivePlayerInput();
 
         if (buildingScanInterval <= 0f) return;
@@ -346,14 +348,8 @@ public class GameManager : MonoBehaviour
         if (uiCanvas == null) return;
         if (FindObjectOfType<GridGenerator>() == null)
         {
-            Transform wp = uiCanvas.transform.Find("WeaponPanel");
-            if (wp != null) Destroy(wp.gameObject);
-            Transform mt = uiCanvas.transform.Find("MainTowersPanel");
-            if (mt != null) Destroy(mt.gameObject);
-            Transform mp = uiCanvas.transform.Find("ManaPanel");
-            if (mp != null) Destroy(mp.gameObject);
-            Transform pp = uiCanvas.transform.Find("PlayerPanels");
-            if (pp != null) Destroy(pp.gameObject);
+            CleanupGameplayUI();
+            gameplayUiReady = false;
             return;
         }
 
@@ -363,6 +359,30 @@ public class GameManager : MonoBehaviour
         SetupWeaponPanel();
         SetupPlayerPanels();
         UpdateMainTowersUI();
+        gameplayUiReady = true;
+    }
+
+    private void EnsureGameplayUi()
+    {
+        if (gameplayUiReady) return;
+        if (uiCanvas == null) return;
+        if (FindObjectOfType<GridGenerator>() == null) return;
+
+        SetupGameplayUI();
+        UpdateManaUI();
+        UpdateMainTowersUI();
+    }
+
+    private void CleanupGameplayUI()
+    {
+        Transform wp = uiCanvas.transform.Find("WeaponPanel");
+        if (wp != null) Destroy(wp.gameObject);
+        Transform mt = uiCanvas.transform.Find("MainTowersPanel");
+        if (mt != null) Destroy(mt.gameObject);
+        Transform mp = uiCanvas.transform.Find("ManaPanel");
+        if (mp != null) Destroy(mp.gameObject);
+        Transform pp = uiCanvas.transform.Find("PlayerPanels");
+        if (pp != null) Destroy(pp.gameObject);
     }
 
     private void UpdateHUD()
@@ -713,36 +733,46 @@ public class GameManager : MonoBehaviour
 
     private void ResetMana()
     {
-        teamMana = Mathf.Clamp(startMana, 0, maxMana);
-        manaFlashTimer = 0f;
+        for (int i = 0; i < playerMana.Length; i++)
+        {
+            playerMana[i] = Mathf.Clamp(startMana, 0, maxMana);
+            manaFlashTimers[i] = 0f;
+        }
         UpdateManaUI();
     }
 
     public bool TrySpendMana(int amount)
     {
+        return TrySpendMana(amount, activePlayerIndex);
+    }
+
+    public bool TrySpendMana(int amount, int playerIndex)
+    {
         if (amount <= 0) return true;
-        if (teamMana < amount)
+        if (playerIndex < 0 || playerIndex >= playerMana.Length) return false;
+        if (playerMana[playerIndex] < amount)
         {
-            manaFlashTimer = 0.6f;
+            manaFlashTimers[playerIndex] = 0.6f;
             UpdateManaUI();
             return false;
         }
 
-        teamMana -= amount;
+        playerMana[playerIndex] -= amount;
         UpdateManaUI();
         return true;
     }
 
     public void AddMana(int amount)
     {
-        if (amount <= 0) return;
-        teamMana = Mathf.Clamp(teamMana + amount, 0, maxMana);
-        UpdateManaUI();
+        AddManaToPlayer(activePlayerIndex, amount);
     }
 
     public void AddManaToPlayer(int index, int amount)
     {
-        AddMana(amount);
+        if (amount <= 0) return;
+        if (index < 0 || index >= playerMana.Length) return;
+        playerMana[index] = Mathf.Clamp(playerMana[index] + amount, 0, maxMana);
+        UpdateManaUI();
     }
 
     private void UpdateManaUI()
@@ -751,10 +781,11 @@ public class GameManager : MonoBehaviour
         {
             PlayerPanelUI panel = playerPanels[i];
             if (panel == null) continue;
+            int manaValue = (i >= 0 && i < playerMana.Length) ? playerMana[i] : 0;
             if (panel.manaText != null)
-                panel.manaText.text = $"mana {teamMana}";
+                panel.manaText.text = $"mana {manaValue}";
             if (panel.manaFill != null)
-                panel.manaFill.fillAmount = (float)teamMana / Mathf.Max(1, maxMana);
+                panel.manaFill.fillAmount = (float)manaValue / Mathf.Max(1, maxMana);
         }
     }
 
@@ -765,9 +796,12 @@ public class GameManager : MonoBehaviour
             PlayerPanelUI panel = playerPanels[i];
             if (panel == null || panel.manaText == null) continue;
 
-            if (manaFlashTimer > 0f)
+            float timer = (i >= 0 && i < manaFlashTimers.Length) ? manaFlashTimers[i] : 0f;
+            if (timer > 0f)
             {
-                manaFlashTimer -= Time.deltaTime;
+                timer -= Time.deltaTime;
+                if (i >= 0 && i < manaFlashTimers.Length)
+                    manaFlashTimers[i] = timer;
                 panel.manaText.color = Color.Lerp(Color.white, new Color(1f, 0.4f, 0.4f, 1f), 0.6f);
             }
             else
@@ -1024,7 +1058,7 @@ public class GameManager : MonoBehaviour
         if (triedLoadCannonSprite) return cachedCannonSprite;
         triedLoadCannonSprite = true;
 
-        cachedCannonSprite = LoadSpriteFromAssetOrDisk("Assets/Sprites/cannon/cannon1.png", "Sprites/cannon/cannon1.png", 100f);
+        cachedCannonSprite = LoadSpriteFromAssetOrDisk("Assets/Resources/Sprites/cannon/cannon1.png", "Sprites/cannon/cannon1.png", 100f);
         return cachedCannonSprite;
     }
 
@@ -1033,18 +1067,30 @@ public class GameManager : MonoBehaviour
         if (triedLoadBulletSprite) return cachedBulletSprite;
         triedLoadBulletSprite = true;
 
-        cachedBulletSprite = LoadSpriteFromAssetOrDisk("Assets/Sprites/bullet.png", "Sprites/bullet.png", 100f);
+        cachedBulletSprite = LoadSpriteFromAssetOrDisk("Assets/Resources/Sprites/bullet.png", "Sprites/bullet.png", 100f);
         return cachedBulletSprite;
     }
 
     private Sprite LoadSpriteFromAssetOrDisk(string assetPath, string relativePath, float pixelsPerUnit)
     {
+        Sprite resourceSprite = LoadSpriteFromResources(relativePath);
+        if (resourceSprite != null)
+            return resourceSprite;
 #if UNITY_EDITOR
         Sprite assetSprite = AssetDatabase.LoadAssetAtPath<Sprite>(assetPath);
         if (assetSprite != null)
             return assetSprite;
 #endif
         return LoadSpriteFromDisk(relativePath, pixelsPerUnit);
+    }
+
+    private Sprite LoadSpriteFromResources(string relativePath)
+    {
+        if (string.IsNullOrEmpty(relativePath))
+            return null;
+
+        string resourcePath = Path.ChangeExtension(relativePath, null);
+        return Resources.Load<Sprite>(resourcePath);
     }
 
     private Sprite LoadSpriteFromDisk(string relativePath, float pixelsPerUnit)
@@ -1081,16 +1127,12 @@ public class GameManager : MonoBehaviour
     private void CheckGameOver()
     {
         if (IsGameOver) return;
-        if (mainTowersRegisteredCount < mainTowers.Length) return;
+        if (!hadAnyBuilding) return;
 
-        for (int i = 0; i < mainTowers.Length; i++)
-        {
-            Building tower = mainTowers[i];
-            if (tower != null && tower.hp > 0)
-                return;
-        }
-
-        TriggerGameOver();
+        buildings.RemoveWhere(b => b == null);
+        buildings.RemoveWhere(b => !IsTrackableBuilding(b));
+        if (buildings.Count == 0)
+            TriggerGameOver();
     }
 
     private void EnsureEventSystem()

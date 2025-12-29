@@ -143,7 +143,7 @@ public class BuildingPlacer : MonoBehaviour
         {
             Debug.LogWarning("BuildingPlacer: объект не содержит компонент Building.");
             if (GameManager.Instance != null && cost > 0)
-                GameManager.Instance.AddManaToPlayer(GameManager.Instance.ActivePlayerIndex, cost);
+                GameManager.Instance.AddMana(cost);
             Destroy(obj);
             return;
         }
