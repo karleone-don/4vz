@@ -72,6 +72,11 @@ public class EnemyGenerator : MonoBehaviour
 
     private System.Collections.IEnumerator WaveLoop()
     {
+        while (TowerSpawner.Instance == null)
+            yield return null;
+        while (!TowerSpawner.Instance.IsStageTwoStarted())
+            yield return null;
+
         int wave = 0;
         while (true)
         {
@@ -194,4 +199,5 @@ public class EnemyGenerator : MonoBehaviour
 
         worldPos = new Vector2(worldX, worldY);
     }
+
 }

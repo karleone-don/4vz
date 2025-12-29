@@ -480,6 +480,11 @@ MonoBehaviour:
   - {fileID: 1553008612626155033, guid: a2ef059ccf621d24283ed98cb681cefb, type: 3}
   - {fileID: 1675985558205374134, guid: 576c30e5c41b31249af66b228900bcf7, type: 3}
   - {fileID: 6548143206022907343, guid: 4fbd15814ac4fab4cbcd2b5fd4146d6e, type: 3}
+  mousePrefabs:
+  - {fileID: 1557112309350020606, guid: bd2c6b73c322d32419247bb3d58e27b8, type: 3}
+  - {fileID: 1557112309350020606, guid: ad84122cc830b9548882592ddb8774a7, type: 3}
+  - {fileID: 1557112309350020606, guid: 886e2d76597b8504e91ae4da181bea97, type: 3}
+  - {fileID: 1557112309350020606, guid: 63235a82d3d924e4bb1e2137a371b0a1, type: 3}
 --- !u!4 &1087826251
 Transform:
   m_ObjectHideFlags: 0
@@ -526,7 +531,15 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::EnemyGenerator
   enemyPrefab: {fileID: 7722795601986673482, guid: a7f90823bebc2e94e9bd90ab3836bad4, type: 3}
+  fastZombiePrefab: {fileID: 0}
+  tankZombiePrefab: {fileID: 0}
+  fastChance: 0.15
+  tankChance: 0.05
+  minTankPerWave: 1
+  startWaveSize: 6
+  waveSizeIncrease: 2
   spawnInterval: 3
+  timeBetweenWaves: 6
   grid: {fileID: 1842196098}
   borderOffset: 5
 --- !u!212 &1530404587

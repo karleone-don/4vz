@@ -1,78 +1,147 @@
 using UnityEngine;
-using System.Collections;
+using UnityEngine.InputSystem;
 
 public class TowerSpawner : MonoBehaviour
 {
+    public static TowerSpawner Instance;
+    [Header("Grid & Prefabs")]
     public GridGenerator grid;
-    public GameObject[] towerPrefabs; // 4 префаба башен
+    public GameObject[] towerPrefabs; // 4 башни
+    public GameObject[] mousePrefabs; // 4 мышки
 
-    private IEnumerator Start()
+    [Header("Mouse Spawn Positions")]
+    public Vector3[] mouseSpawnPositions =
     {
-        if (grid == null)
+        new Vector3(-1f, -1f, 0f),
+        new Vector3(-1f, 1f, 0f),
+        new Vector3(1f, -1f, 0f),
+        new Vector3(1f, 1f, 0f)
+    };
+
+    [Header("Tower Grid Positions")]
+    public Vector2Int[] towerGridPositions =
+    {
+        new Vector2Int(2,2),
+        new Vector2Int(2,5),
+        new Vector2Int(5,2),
+        new Vector2Int(5,5)
+    };
+
+    private GameObject[] spawnedMice;
+    private const int maxPlayers = 4;
+    private bool stageTwoStarted = false;
+
+    private void Awake()
+    {
+        if (Instance != null && Instance != this)
         {
-            Debug.LogError("TowerSpawner: Grid не назначен!");
-            yield break;
+            Destroy(gameObject);
+            return;
         }
+        Instance = this;
 
-        if (towerPrefabs == null || towerPrefabs.Length < 4)
-        {
-            Debug.LogError("TowerSpawner: towerPrefabs не назначен или меньше 4 элементов!");
-            yield break;
-        }
-
-        // ждём один кадр, чтобы все клетки успели создаться
-        yield return null;
-
-        SpawnFixedTowers();
+        spawnedMice = new GameObject[maxPlayers];
     }
 
-    private void SpawnFixedTowers()
+    private void Update()
     {
-        Vector2Int[] positions =
+        if (stageTwoStarted) return;
+
+        for (int i = 0; i < Gamepad.all.Count && i < maxPlayers; i++)
         {
-            new Vector2Int(3,3),
-            new Vector2Int(3,4),
-            new Vector2Int(4,3),
-            new Vector2Int(4,4)
-        };
+            Gamepad pad = Gamepad.all[i];
 
-        for (int i = 0; i < positions.Length; i++)
+            if (pad.buttonSouth.wasPressedThisFrame)
+            {
+                TrySpawnPlayerSet(i);
+            }
+
+            // Если игрок уже есть и нажал треугольник — старт второго этапа
+            if (spawnedMice[i] != null && pad.buttonNorth.wasPressedThisFrame)
+            {
+                StartStageTwo();
+            }
+        }
+    }
+
+    private void TrySpawnPlayerSet(int index)
+    {
+        if (spawnedMice[index] != null) return;
+
+        SpawnMouse(index);
+        SpawnSpecificTower(index);
+    }
+
+    private void SpawnMouse(int index)
+    {
+        if (index >= mousePrefabs.Length || mousePrefabs[index] == null) return;
+
+        Vector3 spawnPos = mouseSpawnPositions[index];
+        GameObject mouse = Instantiate(mousePrefabs[index], spawnPos, Quaternion.identity);
+        spawnedMice[index] = mouse;
+
+        var controller = mouse.GetComponent<MouseController>();
+        if (controller != null)
         {
-            Cell cell = grid.GetCell(positions[i].x, positions[i].y);
-            if (cell == null)
-            {
-                Debug.LogWarning($"TowerSpawner: клетка {positions[i].x},{positions[i].y} не найдена!");
-                continue;
-            }
+            controller.Initialize(index);
+        }
 
-            if (!cell.IsFree)
-            {
-                Debug.LogWarning($"TowerSpawner: клетка {positions[i].x},{positions[i].y} занята!");
-                continue;
-            }
+        var rb2d = mouse.GetComponent<Rigidbody2D>();
+        if (rb2d != null)
+        {
+            rb2d.freezeRotation = true;
+            rb2d.gravityScale = 0f;
+        }
 
-            GameObject prefab = towerPrefabs[i];
-            if (prefab == null)
-            {
-                Debug.LogError($"TowerSpawner: towerPrefabs[{i}] = null!");
-                continue;
-            }
+        Debug.Log($"Игрок {index}: Мышка создана в {spawnPos}");
+    }
 
-            GameObject obj = Instantiate(prefab);
-            Tower tower = obj.GetComponent<Tower>();
-            if (tower == null)
-            {
-                Debug.LogError($"TowerSpawner: префаб {prefab.name} не содержит компонент Tower!");
-                Destroy(obj);
-                continue;
-            }
+    private void SpawnSpecificTower(int index)
+    {
+        if (index >= towerPrefabs.Length || towerPrefabs[index] == null) return;
+        if (index >= towerGridPositions.Length) return;
 
+        Vector2Int gridPos = towerGridPositions[index];
+        Cell cell = grid.GetCell(gridPos.x, gridPos.y);
+        if (cell == null || !cell.IsFree)
+        {
+            Debug.LogWarning($"Клетка {gridPos} занята или не существует!");
+            return;
+        }
+
+        GameObject obj = Instantiate(towerPrefabs[index]);
+        Tower tower = obj.GetComponent<Tower>();
+
+        if (tower != null)
+        {
             tower.Initialize();
             cell.PlaceBuilding(tower);
             if (GameManager.Instance != null)
-                GameManager.Instance.RegisterMainTower(i, tower);
+                GameManager.Instance.RegisterMainTower(index, tower);
 
-            Debug.Log($"TowerSpawner: башня {prefab.name} установлена на клетку {positions[i].x},{positions[i].y}");
+            Debug.Log($"Игрок {index}: Башня создана в клетке {gridPos}");
         }
+        else
+        {
+            Destroy(obj);
+        }
+    }
+
+    private void StartStageTwo()
+    {
+        stageTwoStarted = true;
+        Debug.Log("Этап 2: спавн новых мышек и башен запрещён. Генерация врагов активирована.");
+
+    }
+    public bool IsStageTwoStarted()
+    {
+        return stageTwoStarted;
+    }
+
+    public Vector3 GetMousePosition(int playerIndex)
+    {
+        if (playerIndex >= 0 && playerIndex < spawnedMice.Length && spawnedMice[playerIndex] != null)
+            return spawnedMice[playerIndex].transform.position;
+        return Vector3.zero;
     }
 }
